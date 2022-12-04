@@ -18,7 +18,7 @@ def load_data_100k(path, seed=42, delimiter='\t'):
     n_train = train.shape[0]  # num of training ratings
     n_test = test.shape[0]  # num of test ratings
 
-    val_idx = np.random.choice(n_train, int(n_train * 0.1), replace=False)
+    val_idx = np.random.choice(n_train, int(n_train * 0.05), replace=False)
     val = train[val_idx]
     n_val = val.shape[0]
     train = np.delete(train, val_idx, axis=0)

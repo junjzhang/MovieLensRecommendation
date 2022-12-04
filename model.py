@@ -11,17 +11,18 @@ class KernelLayer(nn.Module):
                  n_emb,
                  lambda_sparse=None,
                  lambda_l2=None,
-                 activation='sigmoid'):
+                 activation='Sigmoid'):
         super().__init__()
         self.W = nn.Parameter(torch.empty(n_in, n_hid))
         self.u = nn.Parameter(torch.empty(n_in, 1, n_emb))
         self.v = nn.Parameter(torch.empty(1, n_hid, n_emb))
         self.b = nn.Parameter(torch.empty(n_hid))
-        if activation == 'identity':
+        if activation == 'Identity':
             self.activation = nn.Identity()
-            activation = 'linear'
+            activation = 'Linear'
         else:
-            self.activation = getattr(nn, activation.capitalize())()
+            self.activation = getattr(nn, activation)()
+        activation = activation.lower()
         nn.init.xavier_uniform_(self.W,
                                 gain=torch.nn.init.calculate_gain(activation))
         nn.init.xavier_uniform_(self.u,
@@ -34,7 +35,7 @@ class KernelLayer(nn.Module):
         self.lambda_l2 = lambda_l2
 
     def local_kernel(self, u, v):
-        return torch.clamp(1 - torch.norm(u - v, dim=2), 0, 1)
+        return torch.clamp(1 - torch.norm(u - v, p=2, dim=2), min=0)
 
     def forward(self, x):
         w_hat = self.local_kernel(self.u, self.v)
@@ -76,7 +77,7 @@ class KernelNet(nn.Module):
                         n_emb,
                         lambda_sparse,
                         lambda_l2,
-                        activation='identity'))
+                        activation='ReLU'))
         self.layers = nn.ModuleList(layers)
         self.dropout = nn.Dropout(dropout)
 
@@ -108,6 +109,8 @@ class GLocalNet(nn.Module):
         self.conv_kernel = torch.nn.Parameter(torch.empty(n_m, gk_size**2))
         nn.init.xavier_uniform_(self.conv_kernel,
                                 gain=torch.nn.init.calculate_gain("leaky_relu"))
+        self.stride = 1
+        self.padding = (gk_size-1)//2
 
     def forward(self, x, x_local):
         gk = self.global_kernel(x_local, self.gk_size, self.dot_scale)
@@ -129,5 +132,5 @@ class GLocalNet(nn.Module):
 
     def global_conv(self, input, W):
         input = input.unsqueeze(0).unsqueeze(0)
-        conv2d = nn.LeakyReLU()(F.conv2d(input, W, stride=1, padding=1))
+        conv2d = nn.LeakyReLU()(F.conv2d(input, W, stride=self.stride, padding=self.padding))
         return conv2d.squeeze(0).squeeze(0)
